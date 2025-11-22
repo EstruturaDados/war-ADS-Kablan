@@ -1,0 +1,317 @@
+/*
+ * Gerenciador de Peças - Fila Circular e Pilha
+ * Autor: Curadoria de TI
+ * Descrição: Sistema que gerencia peças (I, O, T, L) usando uma Fila Circular (Capacidade 5)
+ * e uma Pilha (Capacidade 3). Permite jogar, reservar, usar reserva e realizar trocas.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+// --- Constantes e Definições ---
+#define CAPACIDADE_FILA 5
+#define CAPACIDADE_PILHA 3
+
+// Estrutura da Peça
+typedef struct {
+    char nome;  // Tipo: I, O, T, L
+    int id;     // Identificador único
+} Peca;
+
+// Estrutura da Fila Circular
+typedef struct {
+    Peca itens[CAPACIDADE_FILA];
+    int frente;
+    int tras;
+    int quantidade;
+} FilaCircular;
+
+// Estrutura da Pilha Linear
+typedef struct {
+    Peca itens[CAPACIDADE_PILHA];
+    int topo; // Índice do elemento no topo (-1 se vazia)
+} Pilha;
+
+// Variável global para controle de IDs únicos
+int id_global = 0;
+
+// --- Protótipos das Funções ---
+Peca gerarPeca();
+void inicializarFila(FilaCircular *f);
+void inicializarPilha(Pilha *p);
+int filaCheia(FilaCircular *f);
+int filaVazia(FilaCircular *f);
+int pilhaCheia(Pilha *p);
+int pilhaVazia(Pilha *p);
+void enfileirar(FilaCircular *f, Peca p);
+Peca desenfileirar(FilaCircular *f);
+void empilhar(Pilha *p, Peca item);
+Peca desempilhar(Pilha *p);
+void exibirEstado(FilaCircular *f, Pilha *p);
+void acaoJogar(FilaCircular *f);
+void acaoReservar(FilaCircular *f, Pilha *p);
+void acaoUsarReserva(Pilha *p);
+void acaoTrocarAtual(FilaCircular *f, Pilha *p);
+void acaoTrocaMultipla(FilaCircular *f, Pilha *p);
+
+// --- Função Principal ---
+int main() {
+    // Inicializa semente randômica
+    srand(time(NULL));
+
+    FilaCircular fila;
+    Pilha pilha;
+    int opcao;
+
+    inicializarFila(&fila);
+    inicializarPilha(&pilha);
+
+    // Preenche a fila inicialmente
+    printf("Inicializando sistema...\n");
+    while (!filaCheia(&fila)) {
+        enfileirar(&fila, gerarPeca());
+    }
+
+    do {
+        exibirEstado(&fila, &pilha);
+
+        printf("\nOpcoes disponiveis:\n");
+        printf("1 - Jogar peca da frente da fila\n");
+        printf("2 - Enviar peca da fila para a pilha de reserva\n");
+        printf("3 - Usar peca da pilha de reserva\n");
+        printf("4 - Trocar peca da frente da fila com o topo da pilha\n");
+        printf("5 - Trocar as 3 primeiras da fila com as 3 pecas da pilha\n");
+        printf("0 - Sair\n");
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+
+        // Limpa tela (funciona em Windows e Linux/Mac para fins didáticos simples)
+        #ifdef _WIN32
+            system("cls");
+        #else
+            system("clear");
+        #endif
+
+        switch (opcao) {
+            case 1:
+                acaoJogar(&fila);
+                break;
+            case 2:
+                acaoReservar(&fila, &pilha);
+                break;
+            case 3:
+                acaoUsarReserva(&pilha);
+                break;
+            case 4:
+                acaoTrocarAtual(&fila, &pilha);
+                break;
+            case 5:
+                acaoTrocaMultipla(&fila, &pilha);
+                break;
+            case 0:
+                printf("Encerrando o gerenciador...\n");
+                break;
+            default:
+                printf("Opcao invalida!\n");
+        }
+
+    } while (opcao != 0);
+
+    return 0;
+}
+
+// --- Implementação das Funções Auxiliares ---
+
+// Gera uma peça com tipo aleatório e ID sequencial
+Peca gerarPeca() {
+    Peca p;
+    char tipos[] = {'I', 'O', 'T', 'L'};
+    p.nome = tipos[rand() % 4];
+    p.id = id_global++;
+    return p;
+}
+
+// Inicializa a Fila
+void inicializarFila(FilaCircular *f) {
+    f->frente = 0;
+    f->tras = -1;
+    f->quantidade = 0;
+}
+
+// Inicializa a Pilha
+void inicializarPilha(Pilha *p) {
+    p->topo = -1; // Indica pilha vazia
+}
+
+int filaCheia(FilaCircular *f) {
+    return f->quantidade == CAPACIDADE_FILA;
+}
+
+int filaVazia(FilaCircular *f) {
+    return f->quantidade == 0;
+}
+
+int pilhaCheia(Pilha *p) {
+    return p->topo == CAPACIDADE_PILHA - 1;
+}
+
+int pilhaVazia(Pilha *p) {
+    return p->topo == -1;
+}
+
+// Adiciona item ao final da fila circular
+void enfileirar(FilaCircular *f, Peca p) {
+    if (filaCheia(f)) return;
+
+    f->tras = (f->tras + 1) % CAPACIDADE_FILA; // Lógica circular
+    f->itens[f->tras] = p;
+    f->quantidade++;
+}
+
+// Remove item do início da fila circular
+Peca desenfileirar(FilaCircular *f) {
+    Peca p = {' ', -1}; // Peça vazia/erro
+    if (filaVazia(f)) return p;
+
+    p = f->itens[f->frente];
+    f->frente = (f->frente + 1) % CAPACIDADE_FILA; // Lógica circular
+    f->quantidade--;
+    return p;
+}
+
+// Adiciona item ao topo da pilha
+void empilhar(Pilha *p, Peca item) {
+    if (pilhaCheia(p)) return;
+    p->topo++;
+    p->itens[p->topo] = item;
+}
+
+// Remove item do topo da pilha
+Peca desempilhar(Pilha *p) {
+    Peca item = {' ', -1};
+    if (pilhaVazia(p)) return item;
+    item = p->itens[p->topo];
+    p->topo--;
+    return item;
+}
+
+// Exibe o estado visual das estruturas
+void exibirEstado(FilaCircular *f, Pilha *p) {
+    printf("\n=== ESTADO ATUAL ===\n");
+    
+    // Exibe Fila
+    printf("Fila de pecas:   ");
+    if (filaVazia(f)) {
+        printf("[ Vazia ]");
+    } else {
+        int i, count;
+        // Percorre a fila circularmente sem alterar os índices originais
+        for (count = 0, i = f->frente; count < f->quantidade; count++) {
+            printf("[%c %d] ", f->itens[i].nome, f->itens[i].id);
+            i = (i + 1) % CAPACIDADE_FILA;
+        }
+    }
+    printf("\n");
+
+    // Exibe Pilha
+    printf("Pilha de reserva: (Topo -> base): ");
+    if (pilhaVazia(p)) {
+        printf("[ Vazia ]");
+    } else {
+        for (int i = p->topo; i >= 0; i--) {
+            printf("[%c %d] ", p->itens[i].nome, p->itens[i].id);
+        }
+    }
+    printf("\n====================\n");
+}
+
+// --- Ações do Jogo ---
+
+// 1. Jogar peça da frente (Remove da fila e gera nova no final)
+void acaoJogar(FilaCircular *f) {
+    if (filaVazia(f)) return;
+    
+    Peca p = desenfileirar(f);
+    printf(">>> Voce jogou a peca: [%c %d]\n", p.nome, p.id);
+    
+    // Repor fila
+    enfileirar(f, gerarPeca());
+}
+
+// 2. Reservar peça (Tira da fila, põe na pilha, gera nova na fila)
+void acaoReservar(FilaCircular *f, Pilha *p) {
+    if (pilhaCheia(p)) {
+        printf(">>> ERRO: A pilha de reserva esta cheia (Max 3)!\n");
+        return;
+    }
+    
+    Peca pecaDaFila = desenfileirar(f);
+    empilhar(p, pecaDaFila);
+    printf(">>> Peca [%c %d] movida para a reserva.\n", pecaDaFila.nome, pecaDaFila.id);
+    
+    // Repor fila
+    enfileirar(f, gerarPeca());
+}
+
+// 3. Usar peça da reserva (Remove da pilha, a peça é 'gasta')
+void acaoUsarReserva(Pilha *p) {
+    if (pilhaVazia(p)) {
+        printf(">>> ERRO: Nao ha pecas na reserva!\n");
+        return;
+    }
+    
+    Peca peca = desempilhar(p);
+    printf(">>> Voce usou a peca da reserva: [%c %d]\n", peca.nome, peca.id);
+}
+
+// 4. Troca simples (Frente da fila <-> Topo da Pilha)
+void acaoTrocarAtual(FilaCircular *f, Pilha *p) {
+    if (filaVazia(f) || pilhaVazia(p)) {
+        printf(">>> ERRO: Necessario ter pecas na fila e na pilha para trocar.\n");
+        return;
+    }
+
+    // Acesso direto para troca (sem remover/adicionar contadores)
+    // Nota: Em uma implementação estrita de TAD, usariamos pop/push/dequeue/enqueue,
+    // mas para troca in-place, acessamos os arrays via ponteiros de índice.
+    
+    Peca temp = f->itens[f->frente];
+    f->itens[f->frente] = p->itens[p->topo];
+    p->itens[p->topo] = temp;
+
+    printf(">>> Troca realizada com sucesso!\n");
+}
+
+// 5. Troca Múltipla (3 da fila <-> 3 da pilha)
+void acaoTrocaMultipla(FilaCircular *f, Pilha *p) {
+    // Validação: Pilha precisa estar cheia (3 itens) e Fila ter pelo menos 3
+    if (p->topo < 2 || f->quantidade < 3) {
+        printf(">>> ERRO: Requisito nao atendido (Pilha deve ter 3 pecas e Fila min 3).\n");
+        return;
+    }
+
+    printf(">>> Realizando troca multipla (3 pecas)...\n");
+
+    // Realiza a troca dos 3 elementos
+    // Pilha índices: topo, topo-1, topo-2
+    // Fila índices: frente, (frente+1)%5, (frente+2)%5
+    
+    int idxFila = f->frente;
+    int idxPilha = p->topo;
+
+    for (int i = 0; i < 3; i++) {
+        Peca temp = f->itens[idxFila];
+        
+        // Fila recebe da Pilha
+        f->itens[idxFila] = p->itens[idxPilha];
+        
+        // Pilha recebe da Fila (Temp)
+        p->itens[idxPilha] = temp;
+
+        // Avança índice circular da fila
+        idxFila = (idxFila + 1) % CAPACIDADE_FILA;
+        // Recua índice linear da pilha
+        idxPilha--;
+    }
+}
