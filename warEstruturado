@@ -1,0 +1,259 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// Definições de constantes para facilitar a manutenção
+#define MAX_NOME 30
+#define MAX_COR 10
+#define TAM_MISSAO 100
+#define QTD_MISSOES 5
+#define QTD_TERRITORIOS 4
+
+// Estrutura que representa um Território
+typedef struct {
+    char nome[MAX_NOME];
+    char cor[MAX_COR]; // Ex: "Azul", "Vermelho"
+    int tropas;
+} Territorio;
+
+// ================= PROTÓTIPOS DAS FUNÇÕES =================
+
+void inicializarMissoes(char* listaMissoes[]);
+void atribuirMissao(char* destino, char* missoes[], int totalMissoes);
+int verificarMissao(char* missao, Territorio* mapa, int tamanho, char* corJogador);
+void exibirMissao(char* missao);
+void exibirMapa(Territorio* mapa, int tamanho);
+void atacar(Territorio* atacante, Territorio* defensor);
+void liberarMemoria(Territorio* mapa, char* missaoJ1, char* missaoJ2);
+
+// ================= FUNÇÃO PRINCIPAL (MAIN) =================
+
+int main() {
+    // Semente para números aleatórios baseada no tempo atual
+    srand(time(NULL));
+
+    // 1. Criação do vetor de missões (ponteiros para strings literais)
+    char* listaDeMissoes[QTD_MISSOES];
+    inicializarMissoes(listaDeMissoes);
+
+    // 2. Alocação de memória para o Mapa (Vetor de Territórios)
+    Territorio* mapa = (Territorio*) calloc(QTD_TERRITORIOS, sizeof(Territorio));
+    if (mapa == NULL) {
+        printf("Erro de alocacao de memoria no mapa.\n");
+        return 1;
+    }
+
+    // Inicialização manual do mapa para teste
+    strcpy(mapa[0].nome, "Brasil"); strcpy(mapa[0].cor, "Azul"); mapa[0].tropas = 5;
+    strcpy(mapa[1].nome, "Argentina"); strcpy(mapa[1].cor, "Vermelho"); mapa[1].tropas = 3;
+    strcpy(mapa[2].nome, "Argelia"); strcpy(mapa[2].cor, "Azul"); mapa[2].tropas = 2;
+    strcpy(mapa[3].nome, "Egito"); strcpy(mapa[3].cor, "Vermelho"); mapa[3].tropas = 4;
+
+    // 3. Alocação dinâmica para as missões dos jogadores
+    char* missaoJogadorAzul = (char*) malloc(TAM_MISSAO * sizeof(char));
+    char* missaoJogadorVermelho = (char*) malloc(TAM_MISSAO * sizeof(char));
+
+    if (missaoJogadorAzul == NULL || missaoJogadorVermelho == NULL) {
+        printf("Erro de alocacao de memoria nas missoes.\n");
+        return 1;
+    }
+
+    // 4. Sorteio e atribuição das missões (Passagem por referência do buffer)
+    printf("=== SORTEIO DE MISSOES ===\n");
+    atribuirMissao(missaoJogadorAzul, listaDeMissoes, QTD_MISSOES);
+    atribuirMissao(missaoJogadorVermelho, listaDeMissoes, QTD_MISSOES);
+
+    // Exibição inicial (apenas uma vez)
+    printf("Jogador AZUL: ");
+    exibirMissao(missaoJogadorAzul); // Passagem por valor (ponteiro é passado, mas conteúdo é lido)
+    
+    printf("Jogador VERMELHO: ");
+    exibirMissao(missaoJogadorVermelho);
+    printf("==========================\n\n");
+
+    // 5. Simulação de um turno (Exemplo de Ataque)
+    printf("--- Inicio do Turno ---\n");
+    exibirMapa(mapa, QTD_TERRITORIOS);
+
+    printf("\n> Acao: Brasil (Azul) ataca Argentina (Vermelho)!\n");
+    // Validação simples: só ataca se for inimigo (implementada dentro ou antes de chamar atacar)
+    if (strcmp(mapa[0].cor, mapa[1].cor) != 0) {
+        atacar(&mapa[0], &mapa[1]); // Passagem por referência (ponteiro para struct)
+    } else {
+        printf("Ataque invalido: mesmo time.\n");
+    }
+
+    printf("\n--- Mapa apos ataque ---\n");
+    exibirMapa(mapa, QTD_TERRITORIOS);
+
+    // 6. Verificação de Vitória (Exibição Condicional)
+    printf("\n--- Verificacao de Objetivos ---\n");
+    
+    int vitoriaAzul = verificarMissao(missaoJogadorAzul, mapa, QTD_TERRITORIOS, "Azul");
+    int vitoriaVermelho = verificarMissao(missaoJogadorVermelho, mapa, QTD_TERRITORIOS, "Vermelho");
+
+    if (vitoriaAzul) {
+        printf("PARABENS! O Jogador AZUL cumpriu sua missao: %s\n", missaoJogadorAzul);
+    }
+    if (vitoriaVermelho) {
+        printf("PARABENS! O Jogador VERMELHO cumpriu sua missao: %s\n", missaoJogadorVermelho);
+    }
+    if (!vitoriaAzul && !vitoriaVermelho) {
+        printf("Nenhum jogador atingiu o objetivo neste turno.\n");
+    }
+
+    // 7. Liberação de memória
+    liberarMemoria(mapa, missaoJogadorAzul, missaoJogadorVermelho);
+
+    return 0;
+}
+
+// ================= IMPLEMENTAÇÃO DAS FUNÇÕES =================
+
+/*
+ * Preenche o vetor de strings com descrições pré-definidas.
+ */
+void inicializarMissoes(char* listaMissoes[]) {
+    listaMissoes[0] = "Conquistar 3 territorios.";
+    listaMissoes[1] = "Eliminar todas as tropas da cor Vermelho."; // Exemplo de alvo específico
+    listaMissoes[2] = "Eliminar todas as tropas da cor Azul.";
+    listaMissoes[3] = "Conquistar a Argentina.";
+    listaMissoes[4] = "Possuir 10 tropas no total.";
+}
+
+/*
+ * Sorteia um índice aleatório e copia a string para a memória do jogador.
+ * Parâmetros:
+ * - destino: ponteiro para a área de memória alocada do jogador.
+ * - missoes: vetor contendo as opções.
+ * - totalMissoes: quantidade de opções.
+ */
+void atribuirMissao(char* destino, char* missoes[], int totalMissoes) {
+    int indice = rand() % totalMissoes;
+    // Uso de strcpy conforme requisito
+    strcpy(destino, missoes[indice]);
+}
+
+/*
+ * Exibe a missão na tela.
+ */
+void exibirMissao(char* missao) {
+    printf("Sua missao eh: \"%s\"\n", missao);
+}
+
+/*
+ * Mostra o estado atual do mapa.
+ */
+void exibirMapa(Territorio* mapa, int tamanho) {
+    for(int i = 0; i < tamanho; i++) {
+        printf("[%d] %s (%s) - Tropas: %d\n", i, mapa[i].nome, mapa[i].cor, mapa[i].tropas);
+    }
+}
+
+/*
+ * Lógica de combate com dados.
+ * Passagem por referência (ponteiros) permite alterar os territórios originais.
+ */
+void atacar(Territorio* atacante, Territorio* defensor) {
+    if (atacante->tropas <= 1) {
+        printf("Ataque cancelado: Tropas insuficientes (minimo 2).\n");
+        return;
+    }
+
+    // Simula rolagem de dados (1 a 6)
+    int dadoAtk = (rand() % 6) + 1;
+    int dadoDef = (rand() % 6) + 1;
+
+    printf("Dados: Atacante [%d] x Defensor [%d] -> ", dadoAtk, dadoDef);
+
+    if (dadoAtk > dadoDef) {
+        printf("Vitoria do ATACANTE!\n");
+        printf("Territorio %s conquistado!\n", defensor->nome);
+        
+        // Transfere a cor
+        strcpy(defensor->cor, atacante->cor);
+        
+        // Transfere metade das tropas (divisão inteira)
+        int tropasMovidas = atacante->tropas / 2;
+        defensor->tropas = tropasMovidas;
+        atacante->tropas -= tropasMovidas; // Remove do atacante as que moveram
+    } else {
+        printf("Vitoria do DEFENSOR!\n");
+        // Atacante perde uma tropa
+        if (atacante->tropas > 0) {
+            atacante->tropas--;
+        }
+    }
+}
+
+/*
+ * Verifica se a missão foi cumprida analisando o estado do mapa.
+ * Retorna 1 se cumpriu, 0 caso contrário.
+ * Esta função analisa a string da missão para decidir qual lógica aplicar.
+ */
+int verificarMissao(char* missao, Territorio* mapa, int tamanho, char* corJogador) {
+    int cumpriu = 0;
+
+    // Lógica para missão: "Conquistar 3 territorios"
+    if (strstr(missao, "3 territorios") != NULL) {
+        int contagem = 0;
+        for (int i = 0; i < tamanho; i++) {
+            if (strcmp(mapa[i].cor, corJogador) == 0) {
+                contagem++;
+            }
+        }
+        if (contagem >= 3) cumpriu = 1;
+    }
+    // Lógica para missão: "Eliminar... Vermelho"
+    else if (strstr(missao, "Eliminar") != NULL && strstr(missao, "Vermelho") != NULL) {
+        int vermelhoVivo = 0;
+        // Se eu sou Azul, verifico se Vermelho sumiu
+        if (strcmp(corJogador, "Azul") == 0) {
+            for (int i = 0; i < tamanho; i++) {
+                if (strcmp(mapa[i].cor, "Vermelho") == 0) vermelhoVivo = 1;
+            }
+            if (!vermelhoVivo) cumpriu = 1;
+        }
+    }
+    // Lógica para missão: "Eliminar... Azul"
+    else if (strstr(missao, "Eliminar") != NULL && strstr(missao, "Azul") != NULL) {
+        int azulVivo = 0;
+        if (strcmp(corJogador, "Vermelho") == 0) {
+            for (int i = 0; i < tamanho; i++) {
+                if (strcmp(mapa[i].cor, "Azul") == 0) azulVivo = 1;
+            }
+            if (!azulVivo) cumpriu = 1;
+        }
+    }
+    // Lógica para missão: "Conquistar a Argentina"
+    else if (strstr(missao, "Argentina") != NULL) {
+        for (int i = 0; i < tamanho; i++) {
+            if (strcmp(mapa[i].nome, "Argentina") == 0) {
+                if (strcmp(mapa[i].cor, corJogador) == 0) cumpriu = 1;
+            }
+        }
+    }
+    // Lógica para missão: "Possuir 10 tropas"
+    else if (strstr(missao, "10 tropas") != NULL) {
+        int totalTropas = 0;
+        for (int i = 0; i < tamanho; i++) {
+            if (strcmp(mapa[i].cor, corJogador) == 0) {
+                totalTropas += mapa[i].tropas;
+            }
+        }
+        if (totalTropas >= 10) cumpriu = 1;
+    }
+
+    return cumpriu;
+}
+
+/*
+ * Libera toda a memória alocada dinamicamente.
+ */
+void liberarMemoria(Territorio* mapa, char* missaoJ1, char* missaoJ2) {
+    if (mapa != NULL) free(mapa);
+    if (missaoJ1 != NULL) free(missaoJ1);
+    if (missaoJ2 != NULL) free(missaoJ2);
+    printf("\nMemoria liberada com sucesso.\n");
+}
